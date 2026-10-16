@@ -12,11 +12,18 @@ export type ProcessCommand = {
   readonly environment: Readonly<Record<string, string>>;
 };
 
+/** Windows PS_PROTECTION facts; `level: "none"` means an ordinary unprotected process. */
+export type ProcessProtection = {
+  readonly level: "none" | "light" | "full";
+  readonly signer: "none" | "authenticode" | "code-generation" | "antimalware" | "lsa" | "windows" | "windows-tcb" | "windows-system" | "app";
+};
+
 export type ProcessSnapshot = {
   readonly pid: number;
   readonly identity?: ProcessIdentity;
   readonly owner: "same" | "different" | "unknown";
   readonly command?: ProcessCommand;
+  readonly protection?: ProcessProtection;
 };
 
 function commandResult(result: NonNullable<ReturnType<NonNullable<NativeBinding["readProcessCommand"]>>>): ProcessCommand {
@@ -68,6 +75,7 @@ export function listProcesses(options: { timeoutMs: number; includeCommand?: boo
       pid: row.pid,
       owner: row.owner,
       ...(row.identity === undefined ? {} : { identity: Object.freeze(row.identity) }),
+      ...(row.protection === undefined ? {} : { protection: Object.freeze(row.protection) }),
       ...(row.command === undefined ? {} : { command: commandResult(row.command) }),
     }));
     if (performance.now() - start >= timeoutMs) throw new ProcSafeError("timeout", "process census exceeded timeoutMs");

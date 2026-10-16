@@ -30,3 +30,15 @@ test("census is Windows-only", () => {
     expect(() => listProcesses({ timeoutMs: 1000 })).toThrow(expect.objectContaining({ code: "unsupported-platform" }));
   }
 });
+
+test("census reports protection facts from the retained handle", () => {
+  if (process.platform !== "win32" || process.env.PROC_SAFE_NATIVE !== "require") return;
+  const rows = listProcesses({ timeoutMs: 5000 });
+  expect(rows.find(row => row.pid === process.pid)?.protection).toEqual({ level: "none", signer: "none" });
+  for (const row of rows) {
+    if (row.protection) {
+      expect(["none", "light", "full"]).toContain(row.protection.level);
+      expect(Object.isFrozen(row.protection)).toBe(true);
+    }
+  }
+});

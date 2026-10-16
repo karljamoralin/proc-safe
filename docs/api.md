@@ -124,11 +124,16 @@ type ProcessCommand = {
   readonly environment: Readonly<Record<string, string>>;
 };
 function readProcessCommand(pid: number, options?: { environmentKeys?: readonly string[] }): ProcessCommand | null;
+type ProcessProtection = {
+  readonly level: "none" | "light" | "full";
+  readonly signer: "none" | "authenticode" | "code-generation" | "antimalware" | "lsa" | "windows" | "windows-tcb" | "windows-system" | "app";
+};
 type ProcessSnapshot = {
   readonly pid: number;
   readonly identity?: ProcessIdentity;
   readonly owner: "same" | "different" | "unknown";
   readonly command?: ProcessCommand;
+  readonly protection?: ProcessProtection;
 };
 function listProcesses(options: { timeoutMs: number; includeCommand?: boolean }): ProcessSnapshot[];
 function isSupported(): boolean;

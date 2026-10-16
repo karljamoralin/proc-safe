@@ -70,6 +70,14 @@ its environment is always empty because the census accepts no environment select
 Without `includeCommand`, only limited process-query access is requested. The returned array
 is mutable; rows and nested observations are frozen.
 
+`protection` reports the kernel's Windows process protection (`PS_PROTECTION`) as `level`
+(`'none'`, `'light'`, or `'full'`) and `signer` (for example `'antimalware'` or `'windows'`). It
+is read through the same retained limited-query handle, so it needs no more access than
+the owner check and is available for protected processes whose command line cannot be read.
+It is omitted when the query is denied or returns a value outside the documented ranges;
+absence never implies `level: 'none'`. The fact is only reported: this package does not
+decide whether a protected process may be ignored.
+
 `timeoutMs` is a required positive finite relative duration. A native monotonic clock checks
 the budget between observations, and the wrapper also checks the total elapsed time after
 result conversion. A synchronous OS call cannot be interrupted; over-budget calls throw on

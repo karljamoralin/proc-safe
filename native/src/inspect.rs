@@ -47,11 +47,19 @@ pub fn read_process_command(
 
 #[cfg(windows)]
 #[napi(object)]
+pub struct ProcessProtection {
+    pub level: String,
+    pub signer: String,
+}
+
+#[cfg(windows)]
+#[napi(object)]
 pub struct ProcessSnapshot {
     pub pid: u32,
     pub identity: Option<crate::identity::ProcessIdentity>,
     pub owner: String,
     pub command: Option<ProcessCommand>,
+    pub protection: Option<ProcessProtection>,
 }
 
 #[cfg(windows)]
@@ -308,6 +316,35 @@ mod windows {
             },
             format!("{operation} failed ({code})"),
         )
+    }
+
+    /// Decodes PS_PROTECTION (ProcessProtectionInformation) from the retained handle.
+    /// Values outside the documented type and signer ranges are not guessed at.
+    fn read_protection(handle: HANDLE) -> Result<ProcessProtection> {
+        let mut raw = [0u8; 1];
+        query(handle, 61, &mut raw)?;
+        let level = match raw[0] & 0x7 {
+            0 => "none",
+            1 => "light",
+            2 => "full",
+            _ => return Err(failure("layout-mismatch", "unknown process protection type")),
+        };
+        let signer = match raw[0] >> 4 {
+            0 => "none",
+            1 => "authenticode",
+            2 => "code-generation",
+            3 => "antimalware",
+            4 => "lsa",
+            5 => "windows",
+            6 => "windows-tcb",
+            7 => "windows-system",
+            8 => "app",
+            _ => return Err(failure("layout-mismatch", "unknown process protection signer")),
+        };
+        Ok(ProcessProtection {
+            level: level.into(),
+            signer: signer.into(),
+        })
     }
 
     fn query(handle: HANDLE, class: u32, bytes: &mut [u8]) -> Result<()> {
@@ -695,6 +732,7 @@ mod windows {
                 identity: None,
                 owner: "unknown".into(),
                 command: None,
+                protection: None,
             };
             let mut can_read_command = include_command;
             let mut raw = if include_command {
@@ -726,6 +764,8 @@ mod windows {
                 }
                 budget.check()?;
                 row.identity = observed(crate::identity::windows::read_handle(pid, handle.0))?;
+                budget.check()?;
+                row.protection = observed(read_protection(handle.0))?;
                 budget.check()?;
                 if can_read_command {
                     row.command = observed(read_handle(pid, handle.0, &[]))?;
